@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TaskFlow</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: system-ui, Arial; max-width:700px; margin:2rem auto; padding:0 1rem; }
+    input, textarea { width:100%; padding:.5rem; margin:.4rem 0; }
+    button { padding:.5rem 1rem; }
+    .task { border:1px solid #ddd; padding:.6rem; margin:.6rem 0; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <h1>TaskFlow</h1>
+
+  <form id="taskForm">
+    <input id="title" placeholder="Task title" required />
+    <textarea id="description" placeholder="Description (optional)"></textarea>
+    <button type="submit">Add Task</button>
+  </form>
+
+  <div id="tasks"></div>
+
+<script>
+const api = (path, opts) => fetch(path, Object.assign({headers: {'Content-Type':'application/json'}}, opts)).then(r => r.json().then(b => ({ok: r.ok, status: r.status, body: b})));
+
+async function load() {
+  const res = await api('/api/tasks');
+  if (res.ok) {
+    const tasks = res.body;
+    const container = document.getElementById('tasks');
+    container.innerHTML = tasks.map(t => `
+      <div class="task" data-id="${t.id}">
+        <h3>${t.title} ${t.done ? '✅' : ''}</h3>
+        <p>${t.description || ''}</p>
+        <small>${new Date(t.created_at).toLocaleString()}</small><br>
+        <button onclick="toggle(${t.id}, ${t.done})">${t.done ? 'Mark Not Done' : 'Mark Done'}</button>
+        <button onclick="del(${t.id})">Delete</button>
+      </div>
+    `).join('');
+  } else {
+    console.error('Failed to load tasks', res);
+  }
+}
+
+document.getElementById('taskForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const title = document.getElementById('title').value;
+  const description = document.getElementById('description').value;
+  const res = await api('/api/tasks', {method:'POST', body: JSON.stringify({title, description})});
+  if (res.ok) {
+    document.getElementById('title').value = '';
+    document.getElementById('description').value = '';
+    load();
+  } else {
+    alert(res.body?.error || 'Failed to add task');
+  }
+});
+
+async function toggle(id, current) {
+  await api('/api/tasks/' + id, {method:'PATCH', body: JSON.stringify({done: !current})});
+  load();
+}
+
+async function del(id) {
+  await api('/api/tasks/' + id, {method:'DELETE'});
+  load();
+}
+
+load();
+</script>
+</body>
+</html>
